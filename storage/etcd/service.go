@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-const key = "topology/"
+var keys = [...]string{"topology/regions/secrets", "topology/regions/configs", "topology/regions/actions"}
 
 type EtcdReconcile struct {
 	Kv     clientv3.KV
@@ -31,16 +31,14 @@ func New(ctx context.Context, endpoints []string, timeout time.Duration) (*EtcdR
 	}, nil
 }
 
-func (r *EtcdReconcile) Start(ctx context.Context) {
+func startWorker(ctx context.Context, key string) {
 	go func() {
 		watchChan := cli.Watch(ctx, key, clientv3.WithPrefix())
 		for {
 			select {
 			case result := <-watchChan:
 				for _, ev := range result.Events {
-					if !strings.Contains("labels", ec.Kv.Key) {
-						fmt.Printf("%s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
-					}
+					fmt.Printf("%s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
 				}
 			case <-ctx.Done():
 				fmt.Println(ctx.Err())
@@ -48,7 +46,12 @@ func (r *EtcdReconcile) Start(ctx context.Context) {
 			}
 		}
 	}()
+}
 
+func (r *EtcdReconcile) Start(ctx context.Context) {
+	for _, key := range keys {
+		startWorker(ctx, key)
+	}
 }
 
 func (r *EtcdReconcile) Flush(topic string) {
