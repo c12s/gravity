@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"github.com/c12s/gravity/config"
+	"github.com/c12s/gravity/flush"
 	"github.com/c12s/gravity/storage"
 	bPb "github.com/c12s/scheme/blackhole"
 	gPb "github.com/c12s/scheme/gravity"
@@ -13,7 +14,8 @@ import (
 )
 
 type Server struct {
-	db storage.DB
+	db    storage.DB
+	flush flush.Flusher
 }
 
 func (s *Server) PutTask(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, error) {
@@ -27,7 +29,7 @@ func (s *Server) PutTask(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, er
 	return nil, nil
 }
 
-func Run(conf *config.Config, db storage.DB) {
+func Run(conf *config.Config, db storage.DB, f flush.Flusher) {
 	lis, err := net.Listen("tcp", conf.Address)
 	if err != nil {
 		log.Fatalf("failed to initializa TCP listen: %v", err)
@@ -36,8 +38,10 @@ func Run(conf *config.Config, db storage.DB) {
 
 	server := grpc.NewServer()
 	gravityServer := &Server{
-		db: db,
+		db:    db,
+		flush: f,
 	}
+	defer db.Close()
 
 	fmt.Println("Gravity RPC Started")
 	gPb.RegisterGravityServiceServer(server, gravityServer)

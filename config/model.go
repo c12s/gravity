@@ -14,6 +14,7 @@ type Config struct {
 	Address     string   `yaml:"address"`
 	Endpoints   []string `yaml:"db"`
 	SEndpoints  []string `yaml:"sdb"`
+	Flusher     string   `yaml:"flusher"`
 }
 
 func ConfigFile(n ...string) (*Config, error) {
