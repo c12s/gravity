@@ -14,8 +14,8 @@ import (
 )
 
 type Server struct {
-	db storage.DB
-	f  flush.Flusher
+	db    storage.DB
+	flush flush.Flusher
 }
 
 func (s *Server) PutTask(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, error) {
@@ -38,8 +38,8 @@ func Run(conf *config.Config, db storage.DB, f flush.Flusher) {
 
 	server := grpc.NewServer()
 	gravityServer := &Server{
-		db: db,
-		f:  f,
+		db:    db,
+		flush: f,
 	}
 
 	fmt.Println("Gravity RPC Started")
