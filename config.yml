@@ -1,0 +1,7 @@
+gravity:
+  version: v1
+  address: localhost:8005
+  sdb:
+      - http://0.0.0.0:8200
+  db:
+      - 0.0.0.0:2379 
