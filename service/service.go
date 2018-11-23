@@ -41,6 +41,7 @@ func Run(conf *config.Config, db storage.DB, f flush.Flusher) {
 		db:    db,
 		flush: f,
 	}
+	defer db.Close()
 
 	fmt.Println("Gravity RPC Started")
 	gPb.RegisterGravityServiceServer(server, gravityServer)

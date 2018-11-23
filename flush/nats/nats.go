@@ -2,6 +2,7 @@ package nats
 
 import (
 	"context"
+	bPb "github.com/c12s/scheme/blackhole"
 	"github.com/nats-io/go-nats"
 )
 
@@ -20,6 +21,6 @@ func New(address string) (*Flusher, error) {
 	}, nil
 }
 
-func (f *Flusher) Flush(ctx context.Context, key string, data map[string]string) error {
+func (f *Flusher) Flush(ctx context.Context, key string, payloads []*bPb.Payload) error {
 	return nil
 }
