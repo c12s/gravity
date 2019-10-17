@@ -2,6 +2,7 @@ package etcd
 
 import (
 	"context"
+	"github.com/c12s/gravity/storage"
 	bPb "github.com/c12s/scheme/blackhole"
 	gPb "github.com/c12s/scheme/gravity"
 	"github.com/coreos/etcd/clientv3"
@@ -12,8 +13,9 @@ import (
 )
 
 type DB struct {
-	Kv     clientv3.KV
-	Client *clientv3.Client
+	Kv          clientv3.KV
+	Client      *clientv3.Client
+	Controllers []storage.ControllManager
 }
 
 func New(endpoints []string, timeout time.Duration) (*DB, error) {
@@ -38,17 +40,17 @@ func (db *DB) Update(ctx context.Context, key, data string) error {
 	return nil
 }
 
-func (db *DB) persist(ctx context.Context, strategy *bPb.Strategy, nodes [][]string, name string, payload []*bPb.Payload) error {
-	kind := AT_ONCE
-	switch strategy.Type {
-	case bPb.StrategyKind_AT_ONCE:
-		kind = AT_ONCE
-	case bPb.StrategyKind_ROLLING_UPDATE:
-		kind = ROLLING_UPDATE
-	case bPb.StrategyKind_CANARY:
-		kind = CANARY
+func (db *DB) StartControllers(ctx context.Context) {
+	for _, manager := range db.Controllers {
+		manager.Start(ctx)
 	}
+}
 
+func (db *DB) RegisterControllers(controllers []storage.ControllManager) {
+	db.Controllers = append(db.Controllers, controllers...)
+}
+
+func (db *DB) persist(ctx context.Context, strategy *bPb.Strategy, nodes [][]string, name, kind string, payload []*bPb.Payload) error {
 	part := &gPb.FlushTaskPart{Nodes: []string{}}
 	for _, val := range nodes {
 		copy(part.Nodes, val)
@@ -75,7 +77,7 @@ func (db *DB) persist(ctx context.Context, strategy *bPb.Strategy, nodes [][]str
 	return nil
 }
 
-func (db *DB) Chop(ctx context.Context, strategy *bPb.Strategy, nodes []string, name string, payload []*bPb.Payload) error {
+func (db *DB) Chop(ctx context.Context, strategy *bPb.Strategy, nodes []string, name, kind string, payload []*bPb.Payload) error {
 	keys := [][]string{}
 	if strategy.Kind == "all" {
 		key := FlushKey(name, strategy.Kind)
@@ -117,7 +119,7 @@ func (db *DB) Chop(ctx context.Context, strategy *bPb.Strategy, nodes []string, 
 			keys = append(keys, val)
 		}
 	}
-	return db.persist(ctx, strategy, keys, name, payload)
+	return db.persist(ctx, strategy, keys, name, kind, payload)
 }
 
 func (db *DB) Filter(ctx context.Context, req *gPb.PutReq) (error, []string) {
