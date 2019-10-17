@@ -5,8 +5,15 @@ import (
 	"github.com/c12s/gravity/config"
 	"github.com/c12s/gravity/flush/nats"
 	"github.com/c12s/gravity/service"
+	"github.com/c12s/gravity/storage"
 	"github.com/c12s/gravity/storage/etcd"
 	"time"
+)
+
+const (
+	secrets = "/flush/secrets/"
+	configs = "/flush/configs/"
+	actions = "/flush/actions/"
 )
 
 func main() {
@@ -21,6 +28,12 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+
+	db.RegisterControllers([]storage.ControllManager{
+		etcd.NewSecretsManager(secrets, db),
+		etcd.NewConfigsManager(configs, db),
+		etcd.NewActionsManager(actions, db),
+	})
 
 	f, err := nats.New(conf.Flusher)
 	if err != nil {
