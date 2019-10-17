@@ -96,7 +96,7 @@ func UUID() string {
 
 func FlushKey(name, kind string) string {
 	s := strings.Join([]string{name, UUID()}, "_")
-	s1 := []string{flush, kind, s}
+	s1 := []string{flush, strings.ToLower(kind), s}
 	return strings.Join(s1, "/")
 }
 

@@ -29,7 +29,8 @@ func (s *Server) atOnce(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, err
 	// Chop those results based on strategy kind and interval
 	// Store into db jobs defined by strategy parameter
 	task := req.Task.Mutate.Task
-	err = s.db.Chop(ctx, task.Strategy, rez, req.Key, task.Payload)
+	kind := req.Task.Mutate.Kind.String()
+	err = s.db.Chop(ctx, task.Strategy, rez, req.Key, kind, task.Payload)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +73,12 @@ func Run(conf *config.Config, db storage.DB, f flush.Flusher) {
 	}
 	defer db.Close()
 
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	db.StartControllers(ctx)
+
 	fmt.Println("Gravity RPC Started")
 	gPb.RegisterGravityServiceServer(server, gravityServer)
 	server.Serve(lis)
+	cancel()
 }
