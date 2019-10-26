@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	secrets = "/flush/secrets/"
-	configs = "/flush/configs/"
-	actions = "/flush/actions/"
+	secrets = "flush/secrets/"
+	configs = "flush/configs/"
+	actions = "flush/actions/"
 )
 
 func main() {
@@ -29,17 +29,17 @@ func main() {
 		return
 	}
 
-	db.RegisterControllers([]storage.ControllManager{
-		etcd.NewSecretsManager(secrets, db),
-		etcd.NewConfigsManager(configs, db),
-		etcd.NewActionsManager(actions, db),
-	})
-
 	f, err := nats.New(conf.Flusher)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	service.Run(conf, db, f)
+	db.RegisterControllers([]storage.ControllManager{
+		etcd.NewSecretsManager(secrets, db, f),
+		etcd.NewConfigsManager(configs, db, f),
+		etcd.NewActionsManager(actions, db, f),
+	})
+
+	service.Run(conf, db)
 }

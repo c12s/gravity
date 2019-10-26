@@ -51,13 +51,12 @@ func (db *DB) RegisterControllers(controllers []storage.ControllManager) {
 }
 
 func (db *DB) persist(ctx context.Context, strategy *bPb.Strategy, nodes [][]string, name, kind string, payload []*bPb.Payload) error {
-	part := &gPb.FlushTaskPart{Nodes: []string{}}
-	for _, val := range nodes {
-		copy(part.Nodes, val)
-	}
-
 	parts := []*gPb.FlushTaskPart{}
-	parts = append(parts, part)
+	for _, val := range nodes {
+		part := &gPb.FlushTaskPart{Nodes: make([]string, len(val))}
+		copy(part.Nodes, val)
+		parts = append(parts, part)
+	}
 
 	ft := &gPb.FlushTask{
 		Parts:    parts,
@@ -80,8 +79,7 @@ func (db *DB) persist(ctx context.Context, strategy *bPb.Strategy, nodes [][]str
 func (db *DB) Chop(ctx context.Context, strategy *bPb.Strategy, nodes []string, name, kind string, payload []*bPb.Payload) error {
 	keys := [][]string{}
 	if strategy.Kind == "all" {
-		key := FlushKey(name, strategy.Kind)
-		keys = append(keys, []string{key})
+		keys = append(keys, nodes)
 	} else if strings.Contains(strategy.Kind, "%") {
 		splitp := []float32{}
 		if strings.Contains(strategy.Kind, ",") {

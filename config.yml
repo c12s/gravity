@@ -1,6 +1,6 @@
 gravity:
   version: v1
-  address: localhost:8005
+  address: localhost:8004
   sdb:
       - http://0.0.0.0:8200
   db:

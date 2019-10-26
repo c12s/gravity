@@ -2,7 +2,8 @@ package nats
 
 import (
 	"context"
-	bPb "github.com/c12s/scheme/blackhole"
+	"fmt"
+	gPb "github.com/c12s/scheme/gravity"
 	"github.com/nats-io/go-nats"
 )
 
@@ -21,6 +22,9 @@ func New(address string) (*Flusher, error) {
 	}, nil
 }
 
-func (f *Flusher) Flush(ctx context.Context, key string, payloads []*bPb.Payload) error {
-	return nil
+func (f *Flusher) Flush(ctx context.Context, data *gPb.FlushTask) {
+	fmt.Println("Flush")
+	for _, val := range data.Parts {
+		fmt.Println(val.Nodes)
+	}
 }

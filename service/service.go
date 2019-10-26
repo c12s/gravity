@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/c12s/gravity/config"
-	"github.com/c12s/gravity/flush"
 	"github.com/c12s/gravity/storage"
 	bPb "github.com/c12s/scheme/blackhole"
 	gPb "github.com/c12s/scheme/gravity"
@@ -15,22 +14,17 @@ import (
 )
 
 type Server struct {
-	db    storage.DB
-	flush flush.Flusher
+	db storage.DB
 }
 
 func (s *Server) atOnce(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, error) {
-	// Select only nodes that satisfy selector [labels] criteria
-	err, rez := s.db.Filter(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
+	fmt.Println("atOnce")
 	// Chop those results based on strategy kind and interval
 	// Store into db jobs defined by strategy parameter
-	task := req.Task.Mutate.Task
-	kind := req.Task.Mutate.Kind.String()
-	err = s.db.Chop(ctx, task.Strategy, rez, req.Key, kind, task.Payload)
+	m := req.Task.Mutate
+	task := m.Task
+	kind := m.Kind.String()
+	err := s.db.Chop(ctx, task.Strategy, req.Task.Index, req.Key, kind, task.Payload)
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +41,8 @@ func (s *Server) canary(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, err
 }
 
 func (s *Server) PutTask(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, error) {
+	fmt.Println("PutTask")
+
 	putTask := req.Task.Mutate.Task
 	switch putTask.Strategy.Type {
 	case bPb.StrategyKind_AT_ONCE:
@@ -59,7 +55,7 @@ func (s *Server) PutTask(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, er
 	return nil, errors.New("Uknown update type!")
 }
 
-func Run(conf *config.Config, db storage.DB, f flush.Flusher) {
+func Run(conf *config.Config, db storage.DB) {
 	lis, err := net.Listen("tcp", conf.Address)
 	if err != nil {
 		log.Fatalf("failed to initializa TCP listen: %v", err)
@@ -68,8 +64,7 @@ func Run(conf *config.Config, db storage.DB, f flush.Flusher) {
 
 	server := grpc.NewServer()
 	gravityServer := &Server{
-		db:    db,
-		flush: f,
+		db: db,
 	}
 	defer db.Close()
 
