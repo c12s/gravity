@@ -86,7 +86,8 @@ func NewKey(path, artifact string) string {
 // topology/regions/regionid/clusterid/nodeid -> topology.regions.regionid.clusterid.nodeid
 func TransformKey(oldKey string) string {
 	noLabels := NewKey(oldKey, "")
-	return strings.Replace(noLabels, "/", ".", -1)
+	temp := strings.Replace(noLabels, "/", ".", -1)
+	return strings.TrimSuffix(temp, ".")
 }
 
 func UUID() string {

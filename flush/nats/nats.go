@@ -3,7 +3,10 @@ package nats
 import (
 	"context"
 	"fmt"
+	h "github.com/c12s/gravity/storage/etcd"
+	fPb "github.com/c12s/scheme/flusher"
 	gPb "github.com/c12s/scheme/gravity"
+	"github.com/golang/protobuf/proto"
 	"github.com/nats-io/go-nats"
 )
 
@@ -24,7 +27,18 @@ func New(address string) (*Flusher, error) {
 
 func (f *Flusher) Flush(ctx context.Context, data *gPb.FlushTask) {
 	fmt.Println("Flush")
-	for _, val := range data.Parts {
-		fmt.Println(val.Nodes)
+	for _, part := range data.Parts {
+		for _, node := range part.Nodes {
+			state, err := proto.Marshal(&fPb.FlushPush{Payload: data.Payload})
+			if err != nil {
+				//TODO: Add to logging service an entry about fail
+				continue
+			}
+
+			//TODO: Should be added to the logging service
+			fmt.Print("Pusing to key: ")
+			fmt.Println(h.TransformKey(node))
+			f.nc.Publish(h.TransformKey(node), state)
+		}
 	}
 }
