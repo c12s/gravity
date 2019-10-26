@@ -26,10 +26,13 @@ func New(address string) (*Flusher, error) {
 }
 
 func (f *Flusher) Flush(ctx context.Context, data *gPb.FlushTask) {
-	fmt.Println("Flush")
 	for _, part := range data.Parts {
 		for _, node := range part.Nodes {
-			state, err := proto.Marshal(&fPb.FlushPush{Payload: data.Payload})
+			state, err := proto.Marshal(&fPb.FlushPush{
+				Payload: data.Payload,
+				TaskKey: data.TaskKey,
+				Kind:    h.Kind(node),
+			})
 			if err != nil {
 				//TODO: Add to logging service an entry about fail
 				continue

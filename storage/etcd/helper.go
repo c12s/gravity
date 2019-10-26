@@ -146,3 +146,8 @@ func PercentSplit(x []string, percentages []float32) (error, [][]string) {
 	}
 	return nil, rez
 }
+
+func Kind(node string) string {
+	parts := strings.Split(node, "/")
+	return parts[len(parts)-1]
+}

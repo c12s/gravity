@@ -24,7 +24,7 @@ func (s *Server) atOnce(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, err
 	m := req.Task.Mutate
 	task := m.Task
 	kind := m.Kind.String()
-	err := s.db.Chop(ctx, task.Strategy, req.Task.Index, req.Key, kind, task.Payload)
+	err := s.db.Chop(ctx, task.Strategy, req.Task.Index, req.Key, kind, req.TaskKey, task.Payload)
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +41,6 @@ func (s *Server) canary(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, err
 }
 
 func (s *Server) PutTask(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, error) {
-	fmt.Println("PutTask")
-
 	putTask := req.Task.Mutate.Task
 	switch putTask.Strategy.Type {
 	case bPb.StrategyKind_AT_ONCE:
