@@ -10,25 +10,57 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+type SyncManager struct {
+	db      *DB
+	flusher flusher.Flusher
+	topic   string
+}
+
+func (sm *SyncManager) Start(ctx context.Context) {
+	sm.flusher.Sub(sm.topic, func(msg *fPb.Update) {
+		go func(data *fPb.Update) {
+			fmt.Println()
+			fmt.Print("GET: ")
+			fmt.Println(msg)
+			fmt.Println()
+		}(msg)
+	})
+}
+
 type SecretsManager struct {
 	keyPrefix string
 	db        *DB
 	flusher   flusher.Flusher
 }
 
-func (sm *SecretsManager) Start(ctx context.Context) {
-	rch := sm.db.Client.Watch(ctx, sm.keyPrefix, clientv3.WithPrefix())
-	for wresp := range rch {
-		for _, ev := range wresp.Events {
-			fmt.Printf("%s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
-			data, err := convert(ev.Kv.Value)
-			if err != nil {
-				continue
-				//TODO: Send error data to log!
-			}
-			sm.flusher.Flush(ctx, "", data)
-		}
+func NewSyncManager(topic string, db *DB, f flusher.Flusher) *SyncManager {
+	return &SyncManager{
+		topic:   topic,
+		db:      db,
+		flusher: f,
 	}
+}
+
+func (sm *SecretsManager) Start(ctx context.Context) {
+	go func() {
+		rch := sm.db.Client.Watch(ctx, sm.keyPrefix, clientv3.WithPrefix())
+		for {
+			select {
+			case result := <-rch:
+				for _, ev := range result.Events {
+					data, err := convert(ev.Kv.Value)
+					if err != nil {
+						continue
+						//TODO: Send error data to log!
+					}
+					sm.flusher.Flush(ctx, data)
+				}
+			case <-ctx.Done():
+				fmt.Println(ctx.Err())
+				return
+			}
+		}
+	}()
 }
 
 func NewSecretsManager(prefix string, db *DB, f flusher.Flusher) *SecretsManager {
@@ -46,18 +78,25 @@ type ConfigsManager struct {
 }
 
 func (cm *ConfigsManager) Start(ctx context.Context) {
-	rch := cm.db.Client.Watch(ctx, cm.keyPrefix, clientv3.WithPrefix())
-	for wresp := range rch {
-		for _, ev := range wresp.Events {
-			fmt.Printf("%s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
-			data, err := convert(ev.Kv.Value)
-			if err != nil {
-				continue
-				//TODO: Send error data to log!
+	go func() {
+		rch := cm.db.Client.Watch(ctx, cm.keyPrefix, clientv3.WithPrefix())
+		for {
+			select {
+			case result := <-rch:
+				for _, ev := range result.Events {
+					data, err := convert(ev.Kv.Value)
+					if err != nil {
+						continue
+						//TODO: Send error data to log!
+					}
+					cm.flusher.Flush(ctx, data)
+				}
+			case <-ctx.Done():
+				fmt.Println(ctx.Err())
+				return
 			}
-			cm.flusher.Flush(ctx, "", data)
 		}
-	}
+	}()
 }
 
 func NewConfigsManager(prefix string, db *DB, f flusher.Flusher) *ConfigsManager {
@@ -75,18 +114,25 @@ type ActionsManager struct {
 }
 
 func (am *ActionsManager) Start(ctx context.Context) {
-	rch := am.db.Client.Watch(ctx, am.keyPrefix, clientv3.WithPrefix())
-	for wresp := range rch {
-		for _, ev := range wresp.Events {
-			fmt.Printf("%s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
-			data, err := convert(ev.Kv.Value)
-			if err != nil {
-				continue
-				//TODO: Send error data to log!
+	go func() {
+		rch := am.db.Client.Watch(ctx, am.keyPrefix, clientv3.WithPrefix())
+		for {
+			select {
+			case result := <-rch:
+				for _, ev := range result.Events {
+					data, err := convert(ev.Kv.Value)
+					if err != nil {
+						continue
+						//TODO: Send error data to log!
+					}
+					am.flusher.Flush(ctx, data)
+				}
+			case <-ctx.Done():
+				fmt.Println(ctx.Err())
+				return
 			}
-			am.flusher.Flush(ctx, "", data)
 		}
-	}
+	}()
 }
 
 func NewActionsManager(prefix string, db *DB, f flusher.Flusher) *ActionsManager {
@@ -97,14 +143,11 @@ func NewActionsManager(prefix string, db *DB, f flusher.Flusher) *ActionsManager
 	}
 }
 
-func convert(buf []byte) (*fPb.FlushPush, error) {
+func convert(buf []byte) (*gPb.FlushTask, error) {
 	data := &gPb.FlushTask{}
 	err := proto.Unmarshal(buf, data)
 	if err != nil {
 		return nil, err
 	}
-
-	return &fPb.FlushPush{
-		Payload: data.Payload,
-	}, nil
+	return data, nil
 }

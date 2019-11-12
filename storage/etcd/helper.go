@@ -86,7 +86,8 @@ func NewKey(path, artifact string) string {
 // topology/regions/regionid/clusterid/nodeid -> topology.regions.regionid.clusterid.nodeid
 func TransformKey(oldKey string) string {
 	noLabels := NewKey(oldKey, "")
-	return strings.Replace(noLabels, "/", ".", -1)
+	temp := strings.Replace(noLabels, "/", ".", -1)
+	return strings.TrimSuffix(temp, ".")
 }
 
 func UUID() string {
@@ -144,4 +145,9 @@ func PercentSplit(x []string, percentages []float32) (error, [][]string) {
 		prv = nxt
 	}
 	return nil, rez
+}
+
+func Kind(node string) string {
+	parts := strings.Split(node, "/")
+	return parts[len(parts)-1]
 }

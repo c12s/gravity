@@ -8,7 +8,7 @@ import (
 
 type DB interface {
 	Update(ctx context.Context, key, data string) error
-	Chop(ctx context.Context, strategy *bPb.Strategy, nodes []string, name, kind string, payload []*bPb.Payload) error
+	Chop(ctx context.Context, strategy *bPb.Strategy, nodes []string, name, kind, taskKey string, payload []*bPb.Payload) error
 	Filter(ctx context.Context, req *gPb.PutReq) (error, []string)
 	Close()
 	StartControllers(ctx context.Context)

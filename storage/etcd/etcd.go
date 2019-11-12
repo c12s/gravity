@@ -50,19 +50,19 @@ func (db *DB) RegisterControllers(controllers []storage.ControllManager) {
 	db.Controllers = append(db.Controllers, controllers...)
 }
 
-func (db *DB) persist(ctx context.Context, strategy *bPb.Strategy, nodes [][]string, name, kind string, payload []*bPb.Payload) error {
-	part := &gPb.FlushTaskPart{Nodes: []string{}}
-	for _, val := range nodes {
-		copy(part.Nodes, val)
-	}
-
+func (db *DB) persist(ctx context.Context, strategy *bPb.Strategy, nodes [][]string, name, kind, taskKey string, payload []*bPb.Payload) error {
 	parts := []*gPb.FlushTaskPart{}
-	parts = append(parts, part)
+	for _, val := range nodes {
+		part := &gPb.FlushTaskPart{Nodes: make([]string, len(val))}
+		copy(part.Nodes, val)
+		parts = append(parts, part)
+	}
 
 	ft := &gPb.FlushTask{
 		Parts:    parts,
 		Payload:  payload,
 		Strategy: strategy,
+		TaskKey:  taskKey,
 	}
 
 	cData, err := proto.Marshal(ft)
@@ -77,11 +77,10 @@ func (db *DB) persist(ctx context.Context, strategy *bPb.Strategy, nodes [][]str
 	return nil
 }
 
-func (db *DB) Chop(ctx context.Context, strategy *bPb.Strategy, nodes []string, name, kind string, payload []*bPb.Payload) error {
+func (db *DB) Chop(ctx context.Context, strategy *bPb.Strategy, nodes []string, name, kind, taskKey string, payload []*bPb.Payload) error {
 	keys := [][]string{}
 	if strategy.Kind == "all" {
-		key := FlushKey(name, strategy.Kind)
-		keys = append(keys, []string{key})
+		keys = append(keys, nodes)
 	} else if strings.Contains(strategy.Kind, "%") {
 		splitp := []float32{}
 		if strings.Contains(strategy.Kind, ",") {
@@ -119,7 +118,7 @@ func (db *DB) Chop(ctx context.Context, strategy *bPb.Strategy, nodes []string, 
 			keys = append(keys, val)
 		}
 	}
-	return db.persist(ctx, strategy, keys, name, kind, payload)
+	return db.persist(ctx, strategy, keys, name, kind, taskKey, payload)
 }
 
 func (db *DB) Filter(ctx context.Context, req *gPb.PutReq) (error, []string) {

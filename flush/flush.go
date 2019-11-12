@@ -2,9 +2,11 @@ package flush
 
 import (
 	"context"
-	bPb "github.com/c12s/scheme/blackhole"
+	fPb "github.com/c12s/scheme/flusher"
+	gPb "github.com/c12s/scheme/gravity"
 )
 
 type Flusher interface {
-	Flush(ctx context.Context, key string, payloads []*bPb.Payload) error
+	Flush(ctx context.Context, payloads *gPb.FlushTask)
+	Sub(topic string, f func(msg *fPb.Update))
 }
