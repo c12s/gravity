@@ -28,7 +28,7 @@ func New(address string) (*Flusher, error) {
 func (f *Flusher) Flush(ctx context.Context, data *gPb.FlushTask) {
 	for _, part := range data.Parts {
 		for _, node := range part.Nodes {
-			state, err := proto.Marshal(&fPb.FlushPush{
+			state, err := proto.Marshal(&fPb.Event{
 				Payload: data.Payload,
 				TaskKey: data.TaskKey,
 				Kind:    h.Kind(node),
@@ -44,4 +44,16 @@ func (f *Flusher) Flush(ctx context.Context, data *gPb.FlushTask) {
 			f.nc.Publish(h.TransformKey(node), state)
 		}
 	}
+}
+
+func (fl *Flusher) Sub(topic string, f func(u *fPb.Update)) {
+	fl.nc.Subscribe(topic, func(msg *nats.Msg) {
+		data := &fPb.Update{}
+		err := proto.Unmarshal(msg.Data, data)
+		if err != nil {
+			f(nil)
+		}
+		f(data)
+	})
+	fl.nc.Flush()
 }

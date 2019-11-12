@@ -14,6 +14,7 @@ const (
 	secrets = "flush/secrets/"
 	configs = "flush/configs/"
 	actions = "flush/actions/"
+	sync    = "syncTopic"
 )
 
 func main() {
@@ -39,6 +40,7 @@ func main() {
 		etcd.NewSecretsManager(secrets, db, f),
 		etcd.NewConfigsManager(configs, db, f),
 		etcd.NewActionsManager(actions, db, f),
+		etcd.NewSyncManager(sync, db, f),
 	})
 
 	service.Run(conf, db)

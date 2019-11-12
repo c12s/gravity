@@ -4,15 +4,41 @@ import (
 	"context"
 	"fmt"
 	flusher "github.com/c12s/gravity/flush"
+	fPb "github.com/c12s/scheme/flusher"
 	gPb "github.com/c12s/scheme/gravity"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/protobuf/proto"
 )
 
+type SyncManager struct {
+	db      *DB
+	flusher flusher.Flusher
+	topic   string
+}
+
+func (sm *SyncManager) Start(ctx context.Context) {
+	sm.flusher.Sub(sm.topic, func(msg *fPb.Update) {
+		go func(data *fPb.Update) {
+			fmt.Println()
+			fmt.Print("GET: ")
+			fmt.Println(msg)
+			fmt.Println()
+		}(msg)
+	})
+}
+
 type SecretsManager struct {
 	keyPrefix string
 	db        *DB
 	flusher   flusher.Flusher
+}
+
+func NewSyncManager(topic string, db *DB, f flusher.Flusher) *SyncManager {
+	return &SyncManager{
+		topic:   topic,
+		db:      db,
+		flusher: f,
+	}
 }
 
 func (sm *SecretsManager) Start(ctx context.Context) {
