@@ -19,8 +19,11 @@ type SyncManager struct {
 func (sm *SyncManager) Start(ctx context.Context) {
 	sm.flusher.Sub(sm.topic, func(msg *fPb.Update) {
 		go func(data *fPb.Update) {
+			//TODO: remove task from gravity or update
+			//TODO: update node job status
+
 			fmt.Println()
-			fmt.Print("GET: ")
+			fmt.Print("GET gravity: ")
 			fmt.Println(msg)
 			fmt.Println()
 		}(msg)
