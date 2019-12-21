@@ -10,11 +10,12 @@ type Celestial struct {
 }
 
 type Config struct {
-	ConfVersion string   `yaml:"version"`
-	Address     string   `yaml:"address"`
-	Endpoints   []string `yaml:"db"`
-	SEndpoints  []string `yaml:"sdb"`
-	Flusher     string   `yaml:"flusher"`
+	ConfVersion    string            `yaml:"version"`
+	Address        string            `yaml:"address"`
+	Endpoints      []string          `yaml:"db"`
+	SEndpoints     []string          `yaml:"sdb"`
+	Flusher        string            `yaml:"flusher"`
+	InstrumentConf map[string]string `yaml:"instrument"`
 }
 
 func ConfigFile(n ...string) (*Config, error) {

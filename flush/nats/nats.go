@@ -6,8 +6,11 @@ import (
 	h "github.com/c12s/gravity/storage/etcd"
 	fPb "github.com/c12s/scheme/flusher"
 	gPb "github.com/c12s/scheme/gravity"
+	sPb "github.com/c12s/scheme/stellar"
+	sg "github.com/c12s/stellar-go"
 	"github.com/golang/protobuf/proto"
-	"github.com/nats-io/go-nats"
+	nats "github.com/nats-io/nats.go"
+	"strings"
 )
 
 type Flusher struct {
@@ -25,20 +28,41 @@ func New(address string) (*Flusher, error) {
 	}, nil
 }
 
+func parse(tags string) map[string]string {
+	rez := map[string]string{}
+	for _, item := range strings.Split(tags, ";") {
+		pair := strings.Split(item, ":")
+		rez[pair[0]] = pair[1]
+	}
+
+	return rez
+}
+
 func (f *Flusher) Flush(ctx context.Context, data *gPb.FlushTask) {
+	span, _ := sg.FromContext(ctx, "flusher.flush")
+	defer span.Finish()
+	fmt.Println(span)
+
 	for _, part := range data.Parts {
 		for _, node := range part.Nodes {
+			ssp := span.Serialize()
 			state, err := proto.Marshal(&fPb.Event{
 				Payload: data.Payload,
 				TaskKey: data.TaskKey,
 				Kind:    h.Kind(node),
+				SpanContext: &sPb.SpanContext{
+					TraceId:       ssp.Get("trace_id")[0],
+					SpanId:        ssp.Get("span_id")[0],
+					ParrentSpanId: ssp.Get("parrent_span_id")[0],
+					Baggage:       parse(ssp.Get("tags")[0]),
+				},
 			})
 			if err != nil {
-				//TODO: Add to logging service an entry about fail
+				span.AddLog(&sg.KV{"marshaling error", err.Error()})
 				continue
 			}
 
-			//TODO: Should be added to the logging service
+			span.AddLog(&sg.KV{"pushing to key", h.TransformKey(node)})
 			fmt.Print("Pusing to key: ")
 			fmt.Println(h.TransformKey(node))
 			f.nc.Publish(h.TransformKey(node), state)

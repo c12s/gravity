@@ -6,6 +6,7 @@ import (
 	flusher "github.com/c12s/gravity/flush"
 	fPb "github.com/c12s/scheme/flusher"
 	gPb "github.com/c12s/scheme/gravity"
+	sg "github.com/c12s/stellar-go"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/protobuf/proto"
 )
@@ -19,8 +20,16 @@ type SyncManager struct {
 func (sm *SyncManager) Start(ctx context.Context) {
 	sm.flusher.Sub(sm.topic, func(msg *fPb.Update) {
 		go func(data *fPb.Update) {
+			span, _ := sg.FromCustomSource(
+				data.SpanContext,
+				data.SpanContext.Baggage,
+				"syncmanager.update",
+			)
+			fmt.Println(span)
+			defer span.Finish()
+
 			//TODO: remove task from gravity or update
-			//TODO: update node job status
+			//TODO: update node job status celestial doing this
 
 			fmt.Println()
 			fmt.Print("GET gravity: ")
@@ -52,11 +61,19 @@ func (sm *SecretsManager) Start(ctx context.Context) {
 			case result := <-rch:
 				for _, ev := range result.Events {
 					data, err := convert(ev.Kv.Value)
+					span, _ := sg.FromCustomSource(
+						data.SpanContext,
+						data.SpanContext.Baggage,
+						"secrets.manager",
+					)
+					fmt.Println(span)
+					defer span.Finish()
+
 					if err != nil {
+						span.AddLog(&sg.KV{"convert error", err.Error()})
 						continue
-						//TODO: Send error data to log!
 					}
-					sm.flusher.Flush(ctx, data)
+					sm.flusher.Flush(sg.NewTracedGRPCContext(nil, span), data)
 				}
 			case <-ctx.Done():
 				fmt.Println(ctx.Err())
@@ -88,11 +105,19 @@ func (cm *ConfigsManager) Start(ctx context.Context) {
 			case result := <-rch:
 				for _, ev := range result.Events {
 					data, err := convert(ev.Kv.Value)
+					span, _ := sg.FromCustomSource(
+						data.SpanContext,
+						data.SpanContext.Baggage,
+						"configs.manager",
+					)
+					fmt.Println(span)
+					defer span.Finish()
+
 					if err != nil {
+						span.AddLog(&sg.KV{"convert error", err.Error()})
 						continue
-						//TODO: Send error data to log!
 					}
-					cm.flusher.Flush(ctx, data)
+					cm.flusher.Flush(sg.NewTracedContext(nil, span), data)
 				}
 			case <-ctx.Done():
 				fmt.Println(ctx.Err())
@@ -124,11 +149,19 @@ func (am *ActionsManager) Start(ctx context.Context) {
 			case result := <-rch:
 				for _, ev := range result.Events {
 					data, err := convert(ev.Kv.Value)
+					span, _ := sg.FromCustomSource(
+						data.SpanContext,
+						data.SpanContext.Baggage,
+						"actions.manager",
+					)
+					fmt.Println(span)
+					defer span.Finish()
+
 					if err != nil {
+						span.AddLog(&sg.KV{"convert error", err.Error()})
 						continue
-						//TODO: Send error data to log!
 					}
-					am.flusher.Flush(ctx, data)
+					am.flusher.Flush(sg.NewTracedGRPCContext(ctx, span), data)
 				}
 			case <-ctx.Done():
 				fmt.Println(ctx.Err())
