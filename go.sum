@@ -3,6 +3,8 @@ github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/MilosSimic/pipes v0.0.0-20191204181555-9ca78dc556f9 h1:8+KLtYwjW/5hlIUgMjcUC+fghCrnk15013nrxbvDyGw=
 github.com/MilosSimic/pipes v0.0.0-20191204181555-9ca78dc556f9/go.mod h1:SXFKorKu81j4ZNG7cL2SMPuN3351CzxFFsGDxjr7roo=
+github.com/c12s/celestial v0.0.0-20191116184452-010db5640055 h1:mH6WdxNur8EOLnVPH9b9dxy8f+DHxfUxqRu+nvJuaJ8=
+github.com/c12s/celestial v0.0.0-20191116184452-010db5640055/go.mod h1:7jnfoKtquHn+9LW+B2IbMpFICfBXCp/5nLTgsPt85LY=
 github.com/c12s/scheme v0.0.0-20191204214602-7126694c68c7 h1:Qe8SE8DyiVQc0p/ecrDvWECMTbhIuqDSiZSUhNlQTWc=
 github.com/c12s/scheme v0.0.0-20191204214602-7126694c68c7/go.mod h1:iaQIUyLmrvaYaQR9fFwdb7fyClDZnvGlD8usIGjAp3w=
 github.com/c12s/scheme v0.0.0-20191219234711-d6d891128c66 h1:GbzJimOf1yDHdb4/InrH1p2O9UfDGg32xVsupZYHV64=

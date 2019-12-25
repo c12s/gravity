@@ -57,10 +57,7 @@ func parse(tags string) map[string]string {
 	rez := map[string]string{}
 	if len(tags) > 0 {
 		for _, item := range strings.Split(tags, ";") {
-
-			fmt.Println("SPLIT ", item)
 			pair := strings.Split(item, ":")
-			fmt.Println("SPLIT ", pair)
 			rez[pair[0]] = pair[1]
 		}
 	}
@@ -82,7 +79,6 @@ func (db *DB) persist(ctx context.Context, strategy *bPb.Strategy, nodes [][]str
 	}
 
 	ssp := span.Serialize()
-	fmt.Println("LUDILO:", ssp.Get("tags"))
 	ft := &gPb.FlushTask{
 		Parts:    parts,
 		Payload:  payload,

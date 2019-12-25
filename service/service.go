@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/c12s/gravity/config"
+	"github.com/c12s/gravity/helper"
 	"github.com/c12s/gravity/storage"
+	aPb "github.com/c12s/scheme/apollo"
 	bPb "github.com/c12s/scheme/blackhole"
 	gPb "github.com/c12s/scheme/gravity"
 	sg "github.com/c12s/stellar-go"
@@ -18,6 +20,7 @@ import (
 type Server struct {
 	db         storage.DB
 	instrument map[string]string
+	apollo     string
 }
 
 func (s *Server) atOnce(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, error) {
@@ -25,12 +28,26 @@ func (s *Server) atOnce(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, err
 	defer span.Finish()
 	fmt.Println(span)
 
+	token, err := helper.ExtractToken(ctx)
+	if err != nil {
+		span.AddLog(&sg.KV{"token error", err.Error()})
+		return nil, err
+	}
+
 	// Chop those results based on strategy kind and interval
 	// Store into db jobs defined by strategy parameter
 	m := req.Task.Mutate
 	task := m.Task
 	kind := m.Kind.String()
-	err := s.db.Chop(sg.NewTracedGRPCContext(ctx, span), task.Strategy, req.Task.Index, req.Key, kind, req.TaskKey, task.Payload)
+	err = s.db.Chop(
+		helper.AppendToken(
+			sg.NewTracedGRPCContext(ctx, span),
+			token,
+		),
+		task.Strategy, req.Task.Index, req.Key,
+		kind, req.TaskKey,
+		task.Payload,
+	)
 	if err != nil {
 		span.AddLog(&sg.KV{"chop error", err.Error()})
 		return nil, err
@@ -53,14 +70,58 @@ func (s *Server) PutTask(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, er
 	fmt.Println(span)
 	fmt.Println("SERIALIZE ", span.Serialize())
 
+	token, err := helper.ExtractToken(ctx)
+	if err != nil {
+		span.AddLog(&sg.KV{"token error", err.Error()})
+		return nil, err
+	}
+
+	client := NewApolloClient(s.apollo)
+	resp, err := client.Auth(
+		helper.AppendToken(
+			sg.NewTracedGRPCContext(ctx, span),
+			token,
+		),
+		&aPb.AuthOpt{
+			Data: map[string]string{"intent": "auth"},
+		},
+	)
+	if err != nil {
+		span.AddLog(&sg.KV{"apollo resp error", err.Error()})
+		return nil, err
+	}
+
+	if !resp.Value {
+		span.AddLog(&sg.KV{"apollo.auth value", resp.Data["message"]})
+		return nil, errors.New(resp.Data["message"])
+	}
+
 	putTask := req.Task.Mutate.Task
 	switch putTask.Strategy.Type {
 	case bPb.StrategyKind_AT_ONCE:
-		return s.atOnce(sg.NewTracedGRPCContext(ctx, span), req)
+		return s.atOnce(
+			helper.AppendToken(
+				sg.NewTracedGRPCContext(ctx, span),
+				token,
+			),
+			req,
+		)
 	case bPb.StrategyKind_ROLLING_UPDATE:
-		return s.rollingUpdate(sg.NewTracedGRPCContext(ctx, span), req)
+		return s.rollingUpdate(
+			helper.AppendToken(
+				sg.NewTracedGRPCContext(ctx, span),
+				token,
+			),
+			req,
+		)
 	case bPb.StrategyKind_CANARY:
-		return s.canary(sg.NewTracedGRPCContext(ctx, span), req)
+		return s.canary(
+			helper.AppendToken(
+				sg.NewTracedGRPCContext(ctx, span),
+				token,
+			),
+			req,
+		)
 	}
 
 	span.AddLog(&sg.KV{"kind error", "Uknown update type!"})
@@ -78,6 +139,7 @@ func Run(conf *config.Config, db storage.DB) {
 	gravityServer := &Server{
 		db:         db,
 		instrument: conf.InstrumentConf,
+		apollo:     conf.Apollo,
 	}
 	defer db.Close()
 
