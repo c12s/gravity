@@ -13,6 +13,7 @@ type Config struct {
 	ConfVersion    string            `yaml:"version"`
 	Address        string            `yaml:"address"`
 	Apollo         string            `yaml:"apollo"`
+	Meridian       string            `yaml:"meridian"`
 	Endpoints      []string          `yaml:"db"`
 	SEndpoints     []string          `yaml:"sdb"`
 	Flusher        string            `yaml:"flusher"`

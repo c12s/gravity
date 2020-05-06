@@ -73,7 +73,7 @@ func (sm *SecretsManager) Start(ctx context.Context) {
 						span.AddLog(&sg.KV{"convert error", err.Error()})
 						continue
 					}
-					sm.flusher.Flush(sg.NewTracedGRPCContext(nil, span), data)
+					sm.flusher.Flush(sg.NewTracedContext(nil, span), data)
 				}
 			case <-ctx.Done():
 				fmt.Println(ctx.Err())
@@ -161,7 +161,7 @@ func (am *ActionsManager) Start(ctx context.Context) {
 						span.AddLog(&sg.KV{"convert error", err.Error()})
 						continue
 					}
-					am.flusher.Flush(sg.NewTracedGRPCContext(ctx, span), data)
+					am.flusher.Flush(sg.NewTracedContext(nil, span), data)
 				}
 			case <-ctx.Done():
 				fmt.Println(ctx.Err())

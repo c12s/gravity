@@ -151,3 +151,13 @@ func Kind(node string) string {
 	parts := strings.Split(node, "/")
 	return parts[len(parts)-1]
 }
+
+func GKind(node string) string {
+	fmt.Println("KIND KEY:", node)
+	parts := strings.Split(node, "/")
+	if len(parts) > 6 {
+		return parts[len(parts)-2]
+	} else {
+		return parts[len(parts)-1]
+	}
+}
