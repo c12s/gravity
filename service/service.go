@@ -6,7 +6,6 @@ import (
 	"github.com/c12s/gravity/config"
 	"github.com/c12s/gravity/helper"
 	"github.com/c12s/gravity/storage"
-	aPb "github.com/c12s/scheme/apollo"
 	bPb "github.com/c12s/scheme/blackhole"
 	gPb "github.com/c12s/scheme/gravity"
 	sg "github.com/c12s/stellar-go"
@@ -21,6 +20,7 @@ type Server struct {
 	db         storage.DB
 	instrument map[string]string
 	apollo     string
+	meridian   string
 }
 
 func (s *Server) atOnce(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, error) {
@@ -68,7 +68,6 @@ func (s *Server) PutTask(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, er
 	span, _ := sg.FromGRPCContext(ctx, "gravity.PutTask")
 	defer span.Finish()
 	fmt.Println(span)
-	fmt.Println("SERIALIZE ", span.Serialize())
 
 	token, err := helper.ExtractToken(ctx)
 	if err != nil {
@@ -76,24 +75,16 @@ func (s *Server) PutTask(ctx context.Context, req *gPb.PutReq) (*gPb.PutResp, er
 		return nil, err
 	}
 
-	client := NewApolloClient(s.apollo)
-	resp, err := client.Auth(
-		helper.AppendToken(
-			sg.NewTracedGRPCContext(ctx, span),
-			token,
-		),
-		&aPb.AuthOpt{
-			Data: map[string]string{"intent": "auth"},
-		},
-	)
+	err = s.auth(ctx, putOpt(req, token))
 	if err != nil {
-		span.AddLog(&sg.KV{"apollo resp error", err.Error()})
+		span.AddLog(&sg.KV{"auth error", err.Error()})
 		return nil, err
 	}
 
-	if !resp.Value {
-		span.AddLog(&sg.KV{"apollo.auth value", resp.Data["message"]})
-		return nil, errors.New(resp.Data["message"])
+	_, err = s.checkNS(ctx, req.Task.Mutate.UserId, req.Task.Mutate.Namespace)
+	if err != nil {
+		span.AddLog(&sg.KV{"check ns error", err.Error()})
+		return nil, err
 	}
 
 	putTask := req.Task.Mutate.Task
@@ -140,6 +131,7 @@ func Run(conf *config.Config, db storage.DB) {
 		db:         db,
 		instrument: conf.InstrumentConf,
 		apollo:     conf.Apollo,
+		meridian:   conf.Meridian,
 	}
 	defer db.Close()
 

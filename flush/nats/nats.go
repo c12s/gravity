@@ -49,7 +49,7 @@ func (f *Flusher) Flush(ctx context.Context, data *gPb.FlushTask) {
 			state, err := proto.Marshal(&fPb.Event{
 				Payload: data.Payload,
 				TaskKey: data.TaskKey,
-				Kind:    h.Kind(node),
+				Kind:    h.GKind(node),
 				SpanContext: &sPb.SpanContext{
 					TraceId:       ssp.Get("trace_id")[0],
 					SpanId:        ssp.Get("span_id")[0],
