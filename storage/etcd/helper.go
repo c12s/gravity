@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -77,15 +78,26 @@ func Join(keyPart, artifact string) string {
 	return strings.Join(s, "/")
 }
 
+//topology/regions/userId:namespace/labels/regionid/clusterid/
 func NewKey(path, artifact string) string {
 	keyPart := strings.Join(strings.Split(path, "/labels/"), "/")
 	newKey := Join(keyPart, artifact)
+	if !strings.Contains(newKey, ":topology") {
+		var re = regexp.MustCompile("([a-zA-Z0-9])+:([a-zA-Z0-9])+/")
+		s := re.ReplaceAllString(newKey, "")
+		return Join(s, artifact)
+	}
 	return newKey
 }
 
 // topology/regions/regionid/clusterid/nodeid -> topology.regions.regionid.clusterid.nodeid
 func TransformKey(oldKey string) string {
 	noLabels := NewKey(oldKey, "")
+	if strings.Contains(noLabels, ":topology") {
+		parts := strings.Split(noLabels, "/")
+		return parts[len(parts)-3]
+	}
+
 	temp := strings.Replace(noLabels, "/", ".", -1)
 	return strings.TrimSuffix(temp, ".")
 }
@@ -153,8 +165,14 @@ func Kind(node string) string {
 }
 
 func GKind(node string) string {
-	fmt.Println("KIND KEY:", node)
-	parts := strings.Split(node, "/")
+	newNode := node
+	if !strings.Contains(node, ":topology") {
+		var re = regexp.MustCompile("/([a-zA-Z0-9])+:([a-zA-Z0-9])+/")
+		newNode = re.ReplaceAllString(node, "/")
+	}
+
+	fmt.Println("KIND KEY:", newNode)
+	parts := strings.Split(newNode, "/")
 	if len(parts) > 6 {
 		return parts[len(parts)-2]
 	} else {

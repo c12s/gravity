@@ -6,7 +6,7 @@ import (
 	"github.com/c12s/gravity/helper"
 	aPb "github.com/c12s/scheme/apollo"
 	bPb "github.com/c12s/scheme/blackhole"
-	cPb "github.com/c12s/scheme/celestial"
+	// cPb "github.com/c12s/scheme/celestial"
 	gPb "github.com/c12s/scheme/gravity"
 	mPb "github.com/c12s/scheme/meridian"
 	sg "github.com/c12s/stellar-go"
@@ -70,18 +70,6 @@ func (s *Server) checkNS(ctx context.Context, userid, namespace string) (string,
 	return mrsp.Extras["exists"], nil
 }
 
-func listKind(kind cPb.ReqKind) string {
-	switch kind {
-	case cPb.ReqKind_SECRETS:
-		return "secrets"
-	case cPb.ReqKind_ACTIONS:
-		return "actions"
-	case cPb.ReqKind_CONFIGS:
-		return "configs"
-	}
-	return ""
-}
-
 func mutateKind(kind bPb.TaskKind) string {
 	switch kind {
 	case bPb.TaskKind_SECRETS:
@@ -90,6 +78,8 @@ func mutateKind(kind bPb.TaskKind) string {
 		return "actions"
 	case bPb.TaskKind_CONFIGS:
 		return "configs"
+	case bPb.TaskKind_TOPOLOGY:
+		return "topology"
 	}
 	return ""
 }

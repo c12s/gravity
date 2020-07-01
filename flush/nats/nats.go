@@ -59,6 +59,7 @@ func (f *Flusher) Flush(ctx context.Context, data *gPb.FlushTask) {
 			})
 			if err != nil {
 				span.AddLog(&sg.KV{"marshaling error", err.Error()})
+				fmt.Println("{{GRAVITY ERROR}}", err.Error())
 				continue
 			}
 

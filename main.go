@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	secrets = "flush/secrets/"
-	configs = "flush/configs/"
-	actions = "flush/actions/"
-	sync    = "syncTopic"
+	secrets  = "flush/secrets/"
+	configs  = "flush/configs/"
+	actions  = "flush/actions/"
+	topology = "flush/topology/"
+	sync     = "syncTopic"
 )
 
 func main() {
@@ -40,6 +41,7 @@ func main() {
 		etcd.NewSecretsManager(secrets, db, f),
 		etcd.NewConfigsManager(configs, db, f),
 		etcd.NewActionsManager(actions, db, f),
+		etcd.NewTopologyManager(topology, db, f),
 		etcd.NewSyncManager(sync, db, f),
 	})
 

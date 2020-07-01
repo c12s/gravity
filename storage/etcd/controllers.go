@@ -179,6 +179,50 @@ func NewActionsManager(prefix string, db *DB, f flusher.Flusher) *ActionsManager
 	}
 }
 
+type TopologyManager struct {
+	keyPrefix string
+	db        *DB
+	flusher   flusher.Flusher
+}
+
+func (am *TopologyManager) Start(ctx context.Context) {
+	go func() {
+		rch := am.db.Client.Watch(ctx, am.keyPrefix, clientv3.WithPrefix())
+		for {
+			select {
+			case result := <-rch:
+				for _, ev := range result.Events {
+					data, err := convert(ev.Kv.Value)
+					span, _ := sg.FromCustomSource(
+						data.SpanContext,
+						data.SpanContext.Baggage,
+						"topology.manager",
+					)
+					fmt.Println(span)
+					defer span.Finish()
+
+					if err != nil {
+						span.AddLog(&sg.KV{"convert error", err.Error()})
+						continue
+					}
+					am.flusher.Flush(sg.NewTracedContext(nil, span), data)
+				}
+			case <-ctx.Done():
+				fmt.Println(ctx.Err())
+				return
+			}
+		}
+	}()
+}
+
+func NewTopologyManager(prefix string, db *DB, f flusher.Flusher) *TopologyManager {
+	return &TopologyManager{
+		keyPrefix: prefix,
+		db:        db,
+		flusher:   f,
+	}
+}
+
 func convert(buf []byte) (*gPb.FlushTask, error) {
 	data := &gPb.FlushTask{}
 	err := proto.Unmarshal(buf, data)
