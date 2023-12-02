@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package C12S.AgentQueue;
+
+option go_package = "../api";
+
+service AgentQueue {
+  rpc DeseminateConfig(DeseminateConfigRequest) returns (DeseminateConfigResponse);
+}
+
+message DeseminateConfigRequest {
+  string node_id = 1;
+  bytes config = 2;
+}
+
+message DeseminateConfigResponse {}
