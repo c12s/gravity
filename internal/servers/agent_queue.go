@@ -1,10 +1,13 @@
 package servers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
 	"net"
+	"net/http"
+	"time"
 
 	"github.com/c12s/agent_queue/pkg/api"
 	"github.com/google/uuid"
@@ -27,8 +30,25 @@ func (s *agentQueueServer) DeseminateConfig(ctx context.Context, in *api.Desemin
 		log.Printf("[DeseminateConfig] Error: %s is not a valid UUID", in.NodeId)
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
+	replySubject := fmt.Sprintf("%s/%s", in.NodeId, uuid.New().String())
+	subsctiption, err := s.natsConn.Subscribe(replySubject, func(msg *nats.Msg) {
+		_, err := http.Post(in.Webhook, "application/protobuf", bytes.NewBuffer(msg.Data))
+		if err != nil {
+			log.Printf("[DeseminateConfig] Error: Response from webhook %s: %s", in.Webhook, err.Error())
+		}
+	})
+	if err != nil {
+		log.Printf("[DeseminateConfig] Error: Could not subscribe to the reply subject %s", replySubject)
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
+	go func() {
+		time.Sleep(10 * time.Second)
+		if subsctiption.IsValid() {
+			subsctiption.Unsubscribe()
+		}
+	}()
 
-	err = s.natsConn.Publish(fmt.Sprintf("%s.configs", &nodeId), in.Config)
+	err = s.natsConn.PublishRequest(fmt.Sprintf("%s.configs", &nodeId), replySubject, in.Config)
 	if err != nil {
 		log.Printf("[DeseminateConfig] Error while publishing config to nats. %v", err)
 		return nil, status.Errorf(codes.Aborted, "Could not publish message to nats queue")
