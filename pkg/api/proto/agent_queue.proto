@@ -11,6 +11,7 @@ service AgentQueue {
 message DeseminateConfigRequest {
   string node_id = 1;
   bytes config = 2;
+  string webhook = 3;
 }
 
 message DeseminateConfigResponse {}
