@@ -23,6 +23,21 @@ type agentQueueServer struct {
 	natsConn *nats.Conn
 }
 
+func (s *agentQueueServer) JoinCluster(ctx context.Context, in *api.JoinClusterRequest) (*api.JoinClusterResponse, error) {
+	log.Println("[JoinCluster]: Endpoint execution.")
+	nodeId, err := uuid.Parse(in.NodeId)
+	if err != nil {
+		log.Printf("[JoinCluster] Error: %s is not a valid UUID", in.NodeId)
+		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+	}
+	err = s.natsConn.Publish(fmt.Sprintf("%s.join", &nodeId), []byte(in.JoinAddress))
+	if err != nil {
+		log.Printf("[JoinCluster] Error while publishing msg to nats. %v", err)
+		return nil, status.Errorf(codes.Aborted, "Could not publish message to nats queue")
+	}
+	return &api.JoinClusterResponse{}, nil
+}
+
 func (s *agentQueueServer) DeseminateConfig(ctx context.Context, in *api.DeseminateConfigRequest) (*api.DeseminateConfigResponse, error) {
 	log.Println("[DeseminateConfig]: Endpoint execution.")
 	nodeId, err := uuid.Parse(in.NodeId)

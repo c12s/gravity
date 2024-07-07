@@ -6,6 +6,7 @@ option go_package = "../api";
 
 service AgentQueue {
   rpc DeseminateConfig(DeseminateConfigRequest) returns (DeseminateConfigResponse);
+  rpc JoinCluster(JoinClusterRequest) returns (JoinClusterResponse);
 }
 
 message DeseminateConfigRequest {
@@ -15,3 +16,10 @@ message DeseminateConfigRequest {
 }
 
 message DeseminateConfigResponse {}
+
+message JoinClusterRequest {
+  string node_id = 1;
+  string join_address = 2;
+}
+
+message JoinClusterResponse {}
