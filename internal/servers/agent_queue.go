@@ -30,7 +30,7 @@ func (s *agentQueueServer) JoinCluster(ctx context.Context, in *api.JoinClusterR
 		log.Printf("[JoinCluster] Error: %s is not a valid UUID", in.NodeId)
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
-	err = s.natsConn.Publish(fmt.Sprintf("%s.join", &nodeId), []byte(in.JoinAddress))
+	err = s.natsConn.Publish(fmt.Sprintf("%s.join", &nodeId), []byte(fmt.Sprintf("%s|%s", in.JoinAddress, in.ClusterId)))
 	if err != nil {
 		log.Printf("[JoinCluster] Error while publishing msg to nats. %v", err)
 		return nil, status.Errorf(codes.Aborted, "Could not publish message to nats queue")

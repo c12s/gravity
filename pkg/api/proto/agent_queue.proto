@@ -19,7 +19,8 @@ message DeseminateConfigResponse {}
 
 message JoinClusterRequest {
   string node_id = 1;
-  string join_address = 2;
+  string cluster_id = 2;
+  string join_address = 3;
 }
 
 message JoinClusterResponse {}
