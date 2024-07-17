@@ -23,6 +23,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentQueueClient interface {
 	DeseminateConfig(ctx context.Context, in *DeseminateConfigRequest, opts ...grpc.CallOption) (*DeseminateConfigResponse, error)
+	JoinCluster(ctx context.Context, in *JoinClusterRequest, opts ...grpc.CallOption) (*JoinClusterResponse, error)
 }
 
 type agentQueueClient struct {
@@ -42,11 +43,21 @@ func (c *agentQueueClient) DeseminateConfig(ctx context.Context, in *DeseminateC
 	return out, nil
 }
 
+func (c *agentQueueClient) JoinCluster(ctx context.Context, in *JoinClusterRequest, opts ...grpc.CallOption) (*JoinClusterResponse, error) {
+	out := new(JoinClusterResponse)
+	err := c.cc.Invoke(ctx, "/C12S.AgentQueue.AgentQueue/JoinCluster", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentQueueServer is the server API for AgentQueue service.
 // All implementations must embed UnimplementedAgentQueueServer
 // for forward compatibility
 type AgentQueueServer interface {
 	DeseminateConfig(context.Context, *DeseminateConfigRequest) (*DeseminateConfigResponse, error)
+	JoinCluster(context.Context, *JoinClusterRequest) (*JoinClusterResponse, error)
 	mustEmbedUnimplementedAgentQueueServer()
 }
 
@@ -56,6 +67,9 @@ type UnimplementedAgentQueueServer struct {
 
 func (UnimplementedAgentQueueServer) DeseminateConfig(context.Context, *DeseminateConfigRequest) (*DeseminateConfigResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeseminateConfig not implemented")
+}
+func (UnimplementedAgentQueueServer) JoinCluster(context.Context, *JoinClusterRequest) (*JoinClusterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method JoinCluster not implemented")
 }
 func (UnimplementedAgentQueueServer) mustEmbedUnimplementedAgentQueueServer() {}
 
@@ -88,6 +102,24 @@ func _AgentQueue_DeseminateConfig_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentQueue_JoinCluster_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinClusterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentQueueServer).JoinCluster(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/C12S.AgentQueue.AgentQueue/JoinCluster",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentQueueServer).JoinCluster(ctx, req.(*JoinClusterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AgentQueue_ServiceDesc is the grpc.ServiceDesc for AgentQueue service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -98,6 +130,10 @@ var AgentQueue_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeseminateConfig",
 			Handler:    _AgentQueue_DeseminateConfig_Handler,
+		},
+		{
+			MethodName: "JoinCluster",
+			Handler:    _AgentQueue_JoinCluster_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
