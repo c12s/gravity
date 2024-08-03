@@ -24,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 type AgentQueueClient interface {
 	DeseminateConfig(ctx context.Context, in *DeseminateConfigRequest, opts ...grpc.CallOption) (*DeseminateConfigResponse, error)
 	JoinCluster(ctx context.Context, in *JoinClusterRequest, opts ...grpc.CallOption) (*JoinClusterResponse, error)
+	DisseminateAppConfig(ctx context.Context, in *DeseminateConfigRequest, opts ...grpc.CallOption) (*DeseminateConfigResponse, error)
 }
 
 type agentQueueClient struct {
@@ -52,12 +53,22 @@ func (c *agentQueueClient) JoinCluster(ctx context.Context, in *JoinClusterReque
 	return out, nil
 }
 
+func (c *agentQueueClient) DisseminateAppConfig(ctx context.Context, in *DeseminateConfigRequest, opts ...grpc.CallOption) (*DeseminateConfigResponse, error) {
+	out := new(DeseminateConfigResponse)
+	err := c.cc.Invoke(ctx, "/C12S.AgentQueue.AgentQueue/DisseminateAppConfig", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentQueueServer is the server API for AgentQueue service.
 // All implementations must embed UnimplementedAgentQueueServer
 // for forward compatibility
 type AgentQueueServer interface {
 	DeseminateConfig(context.Context, *DeseminateConfigRequest) (*DeseminateConfigResponse, error)
 	JoinCluster(context.Context, *JoinClusterRequest) (*JoinClusterResponse, error)
+	DisseminateAppConfig(context.Context, *DeseminateConfigRequest) (*DeseminateConfigResponse, error)
 	mustEmbedUnimplementedAgentQueueServer()
 }
 
@@ -70,6 +81,9 @@ func (UnimplementedAgentQueueServer) DeseminateConfig(context.Context, *Desemina
 }
 func (UnimplementedAgentQueueServer) JoinCluster(context.Context, *JoinClusterRequest) (*JoinClusterResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method JoinCluster not implemented")
+}
+func (UnimplementedAgentQueueServer) DisseminateAppConfig(context.Context, *DeseminateConfigRequest) (*DeseminateConfigResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DisseminateAppConfig not implemented")
 }
 func (UnimplementedAgentQueueServer) mustEmbedUnimplementedAgentQueueServer() {}
 
@@ -120,6 +134,24 @@ func _AgentQueue_JoinCluster_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AgentQueue_DisseminateAppConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeseminateConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentQueueServer).DisseminateAppConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/C12S.AgentQueue.AgentQueue/DisseminateAppConfig",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentQueueServer).DisseminateAppConfig(ctx, req.(*DeseminateConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AgentQueue_ServiceDesc is the grpc.ServiceDesc for AgentQueue service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -134,6 +166,10 @@ var AgentQueue_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "JoinCluster",
 			Handler:    _AgentQueue_JoinCluster_Handler,
+		},
+		{
+			MethodName: "DisseminateAppConfig",
+			Handler:    _AgentQueue_DisseminateAppConfig_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
