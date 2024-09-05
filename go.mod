@@ -3,6 +3,7 @@ module github.com/c12s/agent_queue
 go 1.21.4
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.3.1
 	github.com/nats-io/nats.go v1.31.0
 	google.golang.org/grpc v1.59.0

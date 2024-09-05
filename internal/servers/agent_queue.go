@@ -9,21 +9,30 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/c12s/agent_queue/internal/configs"
+	"github.com/c12s/agent_queue/internal/services"
 	"github.com/c12s/agent_queue/pkg/api"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 )
 
 type agentQueueServer struct {
 	api.UnimplementedAgentQueueServer
-	natsConn *nats.Conn
+	natsConn   *nats.Conn
+	authorizer services.AuthZService
 }
 
 func (s *agentQueueServer) DisseminateAppConfig(ctx context.Context, in *api.DeseminateConfigRequest) (*api.DeseminateConfigResponse, error) {
+	err := s.authorizer.Authorize(ctx, "config.app.send", "node", in.NodeId)
+	if err != nil {
+		return nil, status.Errorf(codes.PermissionDenied, err.Error())
+	}
+
 	log.Println("[DeseminateAppConfig]: Endpoint execution.")
 	nodeId, err := uuid.Parse(in.NodeId)
 	if err != nil {
@@ -54,6 +63,11 @@ func (s *agentQueueServer) JoinCluster(ctx context.Context, in *api.JoinClusterR
 }
 
 func (s *agentQueueServer) DeseminateConfig(ctx context.Context, in *api.DeseminateConfigRequest) (*api.DeseminateConfigResponse, error) {
+	err := s.authorizer.Authorize(ctx, "config.send", "node", in.NodeId)
+	if err != nil {
+		return nil, status.Errorf(codes.PermissionDenied, err.Error())
+	}
+
 	log.Println("[DeseminateConfig]: Endpoint execution.")
 	nodeId, err := uuid.Parse(in.NodeId)
 	if err != nil {
@@ -86,6 +100,16 @@ func (s *agentQueueServer) DeseminateConfig(ctx context.Context, in *api.Desemin
 	return &api.DeseminateConfigResponse{}, nil
 }
 
+func GetAuthInterceptor() func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if ok && len(md.Get("authz-token")) > 0 {
+			ctx = context.WithValue(ctx, "authz-token", md.Get("authz-token")[0])
+		}
+		return handler(ctx, req)
+	}
+}
+
 func Serve(natsConn *nats.Conn, grpcPort int) {
 	log.Println("Starting grpc server...")
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
@@ -93,8 +117,11 @@ func Serve(natsConn *nats.Conn, grpcPort int) {
 		panic(err)
 	}
 
-	server := grpc.NewServer()
-	api.RegisterAgentQueueServer(server, &agentQueueServer{natsConn: natsConn})
+	//server := grpc.NewServer()
+	server := grpc.NewServer(grpc.UnaryInterceptor(GetAuthInterceptor()))
+	config, _ := configs.NewFromEnv()
+	authorizer := services.NewAuthZService(config.TokenKey())
+	api.RegisterAgentQueueServer(server, &agentQueueServer{natsConn: natsConn, authorizer: authorizer})
 	reflection.Register(server)
 	if err := server.Serve(listener); err != nil {
 		log.Fatalf("Failed to start grpc server: %v", err)
