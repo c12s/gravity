@@ -14,6 +14,9 @@ import (
 	"github.com/c12s/agent_queue/pkg/api"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -39,11 +42,24 @@ func (s *agentQueueServer) DisseminateAppConfig(ctx context.Context, in *api.Des
 		log.Printf("[DeseminateAppConfig] Error: %s is not a valid UUID", in.NodeId)
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
-	err = s.natsConn.Publish(fmt.Sprintf("%s.app_config", &nodeId), in.Config)
+
+	tracer := otel.Tracer("agent_queue.publisher")
+	ctx, span := tracer.Start(ctx, "Publish app_config "+in.NodeId)
+	defer span.End()
+
+	natsMsg := &nats.Msg{
+		Subject: fmt.Sprintf("%s.app_config", &nodeId),
+		Data:    in.Config,
+		Header:  nats.Header{},
+	}
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(natsMsg.Header))
+
+	err = s.natsConn.PublishMsg(natsMsg)
 	if err != nil {
 		log.Printf("[DeseminateAppConfig] Error while publishing msg to nats. %v", err)
 		return nil, status.Errorf(codes.Aborted, "Could not publish message to nats queue")
 	}
+
 	return &api.DeseminateConfigResponse{}, nil
 }
 
@@ -54,11 +70,24 @@ func (s *agentQueueServer) JoinCluster(ctx context.Context, in *api.JoinClusterR
 		log.Printf("[JoinCluster] Error: %s is not a valid UUID", in.NodeId)
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
-	err = s.natsConn.Publish(fmt.Sprintf("%s.join", &nodeId), []byte(fmt.Sprintf("%s|%s", in.JoinAddress, in.ClusterId)))
+
+	tracer := otel.Tracer("agent_queue.publisher")
+	ctx, span := tracer.Start(ctx, "Publish join "+in.NodeId)
+	defer span.End()
+
+	natsMsg := &nats.Msg{
+		Subject: fmt.Sprintf("%s.join", &nodeId),
+		Data:    []byte(fmt.Sprintf("%s|%s", in.JoinAddress, in.ClusterId)),
+		Header:  nats.Header{},
+	}
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(natsMsg.Header))
+
+	err = s.natsConn.PublishMsg(natsMsg)
 	if err != nil {
 		log.Printf("[JoinCluster] Error while publishing msg to nats. %v", err)
 		return nil, status.Errorf(codes.Aborted, "Could not publish message to nats queue")
 	}
+
 	return &api.JoinClusterResponse{}, nil
 }
 
@@ -74,8 +103,14 @@ func (s *agentQueueServer) DeseminateConfig(ctx context.Context, in *api.Desemin
 		log.Printf("[DeseminateConfig] Error: %s is not a valid UUID", in.NodeId)
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
+
 	replySubject := fmt.Sprintf("%s/%s", in.NodeId, uuid.New().String())
-	subsctiption, err := s.natsConn.Subscribe(replySubject, func(msg *nats.Msg) {
+	subscriber, err := s.natsConn.Subscribe(replySubject, func(msg *nats.Msg) {
+		ctx := otel.GetTextMapPropagator().Extract(context.Background(), propagation.HeaderCarrier(msg.Header))
+		tracer := otel.Tracer("agent_queue.subscriber")
+		ctx, span := tracer.Start(ctx, "ReceiveConfig "+replySubject)
+		defer span.End()
+
 		_, err := http.Post(in.Webhook, "application/protobuf", bytes.NewBuffer(msg.Data))
 		if err != nil {
 			log.Printf("[DeseminateConfig] Error: Response from webhook %s: %s", in.Webhook, err.Error())
@@ -87,16 +122,29 @@ func (s *agentQueueServer) DeseminateConfig(ctx context.Context, in *api.Desemin
 	}
 	go func() {
 		time.Sleep(10 * time.Second)
-		if subsctiption.IsValid() {
-			subsctiption.Unsubscribe()
+		if subscriber.IsValid() {
+			subscriber.Unsubscribe()
 		}
 	}()
 
-	err = s.natsConn.PublishRequest(fmt.Sprintf("%s.configs", &nodeId), replySubject, in.Config)
+	tracer := otel.Tracer("agent_queue.publisher")
+	ctx, span := tracer.Start(ctx, "PublishRequest configs "+in.NodeId)
+	defer span.End()
+
+	natsMsg := &nats.Msg{
+		Subject: fmt.Sprintf("%s.configs", &nodeId),
+		Reply:   replySubject,
+		Data:    in.Config,
+		Header:  nats.Header{},
+	}
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(natsMsg.Header))
+
+	err = s.natsConn.PublishMsg(natsMsg)
 	if err != nil {
 		log.Printf("[DeseminateConfig] Error while publishing config to nats. %v", err)
 		return nil, status.Errorf(codes.Aborted, "Could not publish message to nats queue")
 	}
+
 	return &api.DeseminateConfigResponse{}, nil
 }
 
@@ -117,8 +165,11 @@ func Serve(natsConn *nats.Conn, grpcPort int) {
 		panic(err)
 	}
 
-	//server := grpc.NewServer()
-	server := grpc.NewServer(grpc.UnaryInterceptor(GetAuthInterceptor()))
+	server := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.UnaryInterceptor(GetAuthInterceptor()),
+	)
+
 	config, _ := configs.NewFromEnv()
 	authorizer := services.NewAuthZService(config.TokenKey())
 	api.RegisterAgentQueueServer(server, &agentQueueServer{natsConn: natsConn, authorizer: authorizer})
