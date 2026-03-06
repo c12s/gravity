@@ -9,7 +9,7 @@ RUN go mod download
 
 # Kopiraj ostatak koda i builduj
 COPY . .
-RUN go build -o agent_queue ./cmd/server/main.go
+RUN go build -o agent_queue ./cmd/server
 
 # Final stage
 FROM debian:bookworm-slim

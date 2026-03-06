@@ -14,6 +14,7 @@ import (
 	"github.com/c12s/agent_queue/pkg/api"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/grpc"
@@ -164,7 +165,11 @@ func Serve(natsConn *nats.Conn, grpcPort int) {
 		panic(err)
 	}
 
-	server := grpc.NewServer(grpc.UnaryInterceptor(GetAuthInterceptor()))
+	server := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.UnaryInterceptor(GetAuthInterceptor()),
+	)
+
 	config, _ := configs.NewFromEnv()
 	authorizer := services.NewAuthZService(config.TokenKey())
 	api.RegisterAgentQueueServer(server, &agentQueueServer{natsConn: natsConn, authorizer: authorizer})

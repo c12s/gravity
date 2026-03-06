@@ -32,5 +32,8 @@ func main() {
 		log.Panicf("Value in 'GRPC_PORT' env variable is not a valid port number")
 	}
 
+	shutdownTracing := initTracing("gravity", os.Getenv("JAEGER_ADDRESS"))
+	defer shutdownTracing()
+
 	servers.Serve(natsConn, port)
 }
