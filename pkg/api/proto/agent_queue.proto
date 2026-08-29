@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package C12S.AgentQueue;
 
-option go_package = "../api";
+option go_package = "github.com/c12s/agent_queue/pkg/api";
 
 service AgentQueue {
   rpc DeseminateConfig(DeseminateConfigRequest) returns (DeseminateConfigResponse);
@@ -25,3 +25,11 @@ message JoinClusterRequest {
 }
 
 message JoinClusterResponse {}
+
+message OSUpdateCmd {
+  string image_ref = 1;
+  string digest = 2;
+  string reboot_policy = 3;
+}
+
+message OSUpdateAck {}
