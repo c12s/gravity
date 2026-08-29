@@ -76,6 +76,10 @@ func (s *agentQueueServer) DeseminateConfig(ctx context.Context, in *api.Desemin
 	}
 	replySubject := fmt.Sprintf("%s/%s", in.NodeId, uuid.New().String())
 	subsctiption, err := s.natsConn.Subscribe(replySubject, func(msg *nats.Msg) {
+		if msg.Header.Get("Status") != "" {
+			log.Printf("[DeseminateConfig] Skipping no-responders/status message for node %s", in.NodeId)
+			return
+		}
 		_, err := http.Post(in.Webhook, "application/protobuf", bytes.NewBuffer(msg.Data))
 		if err != nil {
 			log.Printf("[DeseminateConfig] Error: Response from webhook %s: %s", in.Webhook, err.Error())
