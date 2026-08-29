@@ -16,6 +16,7 @@ message OSImageRequest {
   string image_ref = 2;
   string digest = 3;
   string reboot_policy = 4;
+  bool rollback = 5;
 }
 
 message OSImageResponse {
@@ -42,6 +43,7 @@ message OSUpdateCmd {
   string image_ref = 1;
   string digest = 2;
   string reboot_policy = 3;
+  bool rollback = 4;
 }
 
 message OSUpdateAck {}

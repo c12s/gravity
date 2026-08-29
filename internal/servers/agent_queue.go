@@ -117,7 +117,7 @@ func (s *agentQueueServer) DisseminateOSImage(ctx context.Context, in *api.OSIma
 		log.Printf("[DisseminateOSImage] Error: %s is not a valid UUID", in.NodeId)
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
-	if in.ImageRef == "" || in.Digest == "" {
+	if !in.Rollback && (in.ImageRef == "" || in.Digest == "") {
 		log.Printf("[DisseminateOSImage] Error: missing image_ref or digest for node %s", in.NodeId)
 		return nil, status.Errorf(codes.InvalidArgument, "image_ref and digest are required")
 	}
@@ -126,6 +126,7 @@ func (s *agentQueueServer) DisseminateOSImage(ctx context.Context, in *api.OSIma
 		ImageRef:     in.ImageRef,
 		Digest:       in.Digest,
 		RebootPolicy: in.RebootPolicy,
+		Rollback:     in.Rollback,
 	})
 	if err != nil {
 		log.Printf("[DisseminateOSImage] Error: could not marshal command: %v", err)
