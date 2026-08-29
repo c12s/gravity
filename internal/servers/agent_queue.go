@@ -19,6 +19,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 type agentQueueServer struct {
@@ -102,6 +103,67 @@ func (s *agentQueueServer) DeseminateConfig(ctx context.Context, in *api.Desemin
 		return nil, status.Errorf(codes.Aborted, "Could not publish message to nats queue")
 	}
 	return &api.DeseminateConfigResponse{}, nil
+}
+
+func (s *agentQueueServer) DisseminateOSImage(ctx context.Context, in *api.OSImageRequest) (*api.OSImageResponse, error) {
+	err := s.authorizer.Authorize(ctx, "os.update", "node", in.NodeId)
+	if err != nil {
+		return nil, status.Errorf(codes.PermissionDenied, err.Error())
+	}
+
+	log.Println("[DisseminateOSImage]: Endpoint execution.")
+	nodeId, err := uuid.Parse(in.NodeId)
+	if err != nil {
+		log.Printf("[DisseminateOSImage] Error: %s is not a valid UUID", in.NodeId)
+		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+	}
+	if in.ImageRef == "" || in.Digest == "" {
+		log.Printf("[DisseminateOSImage] Error: missing image_ref or digest for node %s", in.NodeId)
+		return nil, status.Errorf(codes.InvalidArgument, "image_ref and digest are required")
+	}
+
+	cmd, err := proto.Marshal(&api.OSUpdateCmd{
+		ImageRef:     in.ImageRef,
+		Digest:       in.Digest,
+		RebootPolicy: in.RebootPolicy,
+	})
+	if err != nil {
+		log.Printf("[DisseminateOSImage] Error: could not marshal command: %v", err)
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
+
+	replySubject := fmt.Sprintf("%s/%s", in.NodeId, uuid.New().String())
+	ackChan := make(chan struct{}, 1)
+	subscription, err := s.natsConn.Subscribe(replySubject, func(msg *nats.Msg) {
+		if msg.Header.Get("Status") != "" {
+			log.Printf("[DisseminateOSImage] Skipping no-responders/status message for node %s", in.NodeId)
+			return
+		}
+		ackChan <- struct{}{}
+	})
+	if err != nil {
+		log.Printf("[DisseminateOSImage] Error: could not subscribe to the reply subject %s", replySubject)
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
+	defer subscription.Unsubscribe()
+
+	err = s.natsConn.PublishRequest(fmt.Sprintf("%s.os_update", &nodeId), replySubject, cmd)
+	if err != nil {
+		log.Printf("[DisseminateOSImage] Error while publishing command to nats. %v", err)
+		return nil, status.Errorf(codes.Aborted, "Could not publish message to nats queue")
+	}
+
+	select {
+	case <-ackChan:
+		log.Printf("[DisseminateOSImage] Node %s acknowledged the os update command", in.NodeId)
+		return &api.OSImageResponse{Accepted: true}, nil
+	case <-time.After(10 * time.Second):
+		log.Printf("[DisseminateOSImage] Node %s did not acknowledge the os update command", in.NodeId)
+		return &api.OSImageResponse{Accepted: false}, nil
+	case <-ctx.Done():
+		log.Printf("[DisseminateOSImage] Context done while waiting for node %s ack", in.NodeId)
+		return &api.OSImageResponse{Accepted: false}, nil
+	}
 }
 
 func GetAuthInterceptor() func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
