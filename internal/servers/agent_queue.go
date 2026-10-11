@@ -15,10 +15,12 @@ import (
 	"github.com/c12s/agent_queue/internal/configs"
 	"github.com/c12s/agent_queue/internal/services"
 	"github.com/c12s/agent_queue/pkg/api"
+	magnetarapi "github.com/c12s/magnetar/pkg/api"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
@@ -29,6 +31,13 @@ type agentQueueServer struct {
 	api.UnimplementedAgentQueueServer
 	natsConn   *nats.Conn
 	authorizer services.AuthZService
+	osIntent   osIntentRecorder
+}
+
+// osIntentRecorder is the part of Magnetar's API gravity needs: the declared
+// OS image per node, which nodes pull (magnetar.os.desired.get).
+type osIntentRecorder interface {
+	SetDesiredOsImage(ctx context.Context, in *magnetarapi.DesiredOsImageSetReq, opts ...grpc.CallOption) (*magnetarapi.DesiredOsImageSetResp, error)
 }
 
 func (s *agentQueueServer) DisseminateAppConfig(ctx context.Context, in *api.DeseminateConfigRequest) (*api.DeseminateConfigResponse, error) {
@@ -127,6 +136,16 @@ func (s *agentQueueServer) DisseminateOSImage(ctx context.Context, in *api.OSIma
 		}
 	}
 
+	// Intent first: once Magnetar holds it, a node that misses the push below
+	// (offline, rebooting) still converges when it next pulls.
+	if err := s.recordOSIntent(ctx, in); err != nil {
+		log.Printf("[DisseminateOSImage] Error: could not record desired image for node %s: %v", in.NodeId, err)
+		if status.Code(err) == codes.PermissionDenied || status.Code(err) == codes.NotFound {
+			return nil, err
+		}
+		return nil, status.Errorf(codes.Unavailable, "could not record desired image: %v", err)
+	}
+
 	cmd, err := proto.Marshal(&api.OSUpdateCmd{
 		ImageRef:     in.ImageRef,
 		Digest:       in.Digest,
@@ -172,6 +191,28 @@ func (s *agentQueueServer) DisseminateOSImage(ctx context.Context, in *api.OSIma
 	}
 }
 
+// recordOSIntent stores the request as the node's declared image in Magnetar.
+// A rollback clears it: the node returns to its previous deployment and stays
+// unmanaged until the next update, so the pull must not switch it back.
+func (s *agentQueueServer) recordOSIntent(ctx context.Context, in *api.OSImageRequest) error {
+	req := &magnetarapi.DesiredOsImageSetReq{NodeId: in.NodeId}
+	if !in.Rollback {
+		req.Image = &magnetarapi.DesiredOsImage{
+			ImageRef:     in.ImageRef,
+			Digest:       in.Digest,
+			RebootPolicy: in.RebootPolicy,
+		}
+	}
+	// Magnetar authorizes with the caller's token, like the check above
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		ctx = metadata.NewOutgoingContext(ctx, md)
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	_, err := s.osIntent.SetDesiredOsImage(ctx, req)
+	return err
+}
+
 func GetAuthInterceptor() func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		md, ok := metadata.FromIncomingContext(ctx)
@@ -193,7 +234,15 @@ func Serve(natsConn *nats.Conn, grpcPort int) {
 	server := grpc.NewServer(grpc.UnaryInterceptor(GetAuthInterceptor()))
 	config, _ := configs.NewFromEnv()
 	authorizer := services.NewAuthZService(config.TokenKey())
-	api.RegisterAgentQueueServer(server, &agentQueueServer{natsConn: natsConn, authorizer: authorizer})
+	magnetarConn, err := grpc.Dial(config.MagnetarAddress(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("Failed to create magnetar client: %v", err)
+	}
+	api.RegisterAgentQueueServer(server, &agentQueueServer{
+		natsConn:   natsConn,
+		authorizer: authorizer,
+		osIntent:   magnetarapi.NewMagnetarClient(magnetarConn),
+	})
 	reflection.Register(server)
 	if err := server.Serve(listener); err != nil {
 		log.Fatalf("Failed to start grpc server: %v", err)
