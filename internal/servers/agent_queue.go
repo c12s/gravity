@@ -3,10 +3,13 @@ package servers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/c12s/agent_queue/internal/configs"
@@ -117,9 +120,11 @@ func (s *agentQueueServer) DisseminateOSImage(ctx context.Context, in *api.OSIma
 		log.Printf("[DisseminateOSImage] Error: %s is not a valid UUID", in.NodeId)
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
-	if !in.Rollback && (in.ImageRef == "" || in.Digest == "") {
-		log.Printf("[DisseminateOSImage] Error: missing image_ref or digest for node %s", in.NodeId)
-		return nil, status.Errorf(codes.InvalidArgument, "image_ref and digest are required")
+	if !in.Rollback {
+		if err := validateOSImage(in); err != nil {
+			log.Printf("[DisseminateOSImage] Error: invalid request for node %s: %v", in.NodeId, err)
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
 	}
 
 	cmd, err := proto.Marshal(&api.OSUpdateCmd{
@@ -193,4 +198,23 @@ func Serve(natsConn *nats.Conn, grpcPort int) {
 	if err := server.Serve(listener); err != nil {
 		log.Fatalf("Failed to start grpc server: %v", err)
 	}
+}
+
+var digestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+
+// validateOSImage rejects specs a node could never apply, before they are
+// acknowledged: otherwise the node accepts them and retries a failing switch
+// forever (malformed digest) or stages without rebooting (unknown policy).
+func validateOSImage(in *api.OSImageRequest) error {
+	switch {
+	case in.ImageRef == "" || in.Digest == "":
+		return errors.New("image_ref and digest are required")
+	case strings.ContainsAny(in.ImageRef, "@ \t\n"):
+		return fmt.Errorf("image_ref %q must be a plain reference without a digest; pass the digest separately", in.ImageRef)
+	case !digestPattern.MatchString(in.Digest):
+		return fmt.Errorf("digest %q must be sha256:<64 lowercase hex>", in.Digest)
+	case in.RebootPolicy != "" && in.RebootPolicy != "immediate":
+		return fmt.Errorf("reboot_policy %q is not supported (only \"immediate\")", in.RebootPolicy)
+	}
+	return nil
 }
