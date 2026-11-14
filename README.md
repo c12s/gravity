@@ -27,7 +27,7 @@ image updates.
 | `DeseminateConfig` | `config.send\|node\|<id>` | request/reply over `<node>.configs`; node replies are POSTed to the caller's webhook; subscription dropped after 10 s |
 | `DisseminateAppConfig` | `config.app.send\|node\|<id>` | fire-and-forget publish to `<node>.app_config` |
 | `JoinCluster` | **none** (see bugs) | publish `<address>|<clusterId>` to `<node>.join` |
-| `DisseminateOSImage` | `os.update\|node\|<id>` | validate → record intent in Magnetar (caller's token forwarded) → publish `<node>.os_update`, wait up to 10 s for the node's ack; returns `accepted: true/false` |
+| `DisseminateOSImage` | `os.update` on the node, or on any org (pre-check; Magnetar then checks the node's own org and is authoritative) | validate → record intent in Magnetar (caller's token forwarded) → publish `<node>.os_update`, wait up to 10 s for the node's ack; returns `accepted: true/false` |
 
 `DisseminateOSImage` validation (`internal/servers/agent_queue.go`): both
 `image_ref` and `digest` required; `image_ref` must not embed a digest; digest
