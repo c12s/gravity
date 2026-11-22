@@ -119,7 +119,7 @@ func (s *agentQueueServer) DeseminateConfig(ctx context.Context, in *api.Desemin
 
 func (s *agentQueueServer) DisseminateOSImage(ctx context.Context, in *api.OSImageRequest) (*api.OSImageResponse, error) {
 	// a per-node grant, or an org-level grant that Magnetar matches against
-	// the node's org when the intent is recorded below (review R21)
+	// the node's org when the intent is recorded below
 	err := s.authorizer.AuthorizeNodeOrAnyOrg(ctx, "os.update", in.NodeId)
 	if err != nil {
 		return nil, status.Errorf(codes.PermissionDenied, err.Error())
