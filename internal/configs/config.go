@@ -5,15 +5,21 @@ import (
 )
 
 type Config struct {
-	tokenKey string
+	tokenKey        string
+	magnetarAddress string
 }
 
 func (c *Config) TokenKey() string {
 	return c.tokenKey
 }
 
+func (c *Config) MagnetarAddress() string {
+	return c.magnetarAddress
+}
+
 func NewFromEnv() (*Config, error) {
 	return &Config{
-		tokenKey: os.Getenv("SECRET_KEY"),
+		tokenKey:        os.Getenv("SECRET_KEY"),
+		magnetarAddress: os.Getenv("MAGNETAR_ADDRESS"),
 	}, nil
 }

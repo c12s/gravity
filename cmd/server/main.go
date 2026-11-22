@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/c12s/agent_queue/internal/servers"
+	magnetarapi "github.com/c12s/magnetar/pkg/api"
 	"github.com/nats-io/nats.go"
 )
 
@@ -16,7 +17,7 @@ func createNatsConn() (*nats.Conn, error) {
 		log.Panicf("Environment variable 'NATS_CONN_ADDRESS' empty!")
 	}
 	log.Printf("Trying to connecto to nats on address %s", address)
-	return nats.Connect(fmt.Sprintf("nats://%s", address))
+	return nats.Connect(fmt.Sprintf("nats://%s", address), magnetarapi.NatsOptions()...)
 }
 
 func main() {

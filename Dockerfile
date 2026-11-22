@@ -1,9 +1,11 @@
 FROM golang:alpine as build_container
 WORKDIR /app
-COPY go.mod .
-COPY go.sum .
+COPY ./gravity/go.mod ./gravity/go.sum ./
+COPY ./magnetar ../magnetar
+COPY ./oort ../oort
+COPY ./meridian ../meridian
 RUN go mod download
-COPY . .
+COPY ./gravity/ .
 RUN go build -o agent_queue ./cmd/server/main.go
 
 FROM alpine
